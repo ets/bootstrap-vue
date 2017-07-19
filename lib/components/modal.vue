@@ -1,19 +1,25 @@
 <template>
     <div>
-        <transition-group enter-class="hidden"
-                          enter-to-class=""
-                          enter-active-class=""
-                          @after-enter="focusFirst"
-                          leave-class="show"
-                          leave-active-class=""
-                          leave-to-class="hidden"
+        <transition enter-class=""
+                    enter-active-class=""
+                    enter-to-class=""
+                    @before-enter="onBeforeEnter"
+                    @enter="onEnter"
+                    @after-enter="onAfterEnter"
+                    leave-class=""
+                    leave-active-class=""
+                    leave-to-class=""
+                    @before-leave="onBeforeLeave"
+                    @leave="onLeave"
+                    @after-leave="onAfterLeave"
         >
-            <div :class="['modal',{fade: !noFade, show: is_visible}]"
+            <div :class="['modal',{fade: !noFade, show: isShowing}]"
                  :id="id || null"
                  role="dialog"
                  ref="modal"
                  key="modal"
-                 v-show="is_visible"
+                 v-show="isShowing"
+                 :aria-hidden="isShowing ? 'true' : 'false'"
                  @click="onClickOut()"
                  @keyup.esc="onEsc()"
             >
@@ -70,30 +76,35 @@
                     </div>
                 </div>
             </div>
-
-            <div key="modal-backdrop"
-                 :class="['modal-backdrop',{fade: !noFade, show: is_visible}]"
-                 v-if="is_visible"
-            ></div>
-        </transition-group>
+        </transition>
+        <div key="modal-backdrop"
+             :class="['modal-backdrop',{fade: !noFade, show: is_visible || isTransitioning}]"
+             v-if="isShowing"
+        ></div>
     </div>
 </template>
-
-<style scoped>
-    .hidden {
-        opacity: 0 !important;
-    }
-
-    /* Make modal display as block instead of inline style, and because Vue's v-show deletes inline "display" style */
-    .modal {
-        display: block;
-    }
-</style>
 
 <script>
     import bBtn from './button.vue';
     import { listenOnRootMixin } from '../mixins';
     import { from as arrayFrom } from '../utils/array'
+
+    const ClassName = {
+        SCROLLBAR_MEASURER : 'modal-scrollbar-measure',
+        BACKDROP           : 'modal-backdrop',
+        OPEN               : 'modal-open',
+        FADE               : 'fade',
+        SHOW               : 'show'
+    }
+
+    const Selector = {
+        DIALOG             : '.modal-dialog',
+        FIXED_CONTENT      : '.fixed-top, .fixed-bottom, .is-fixed, .sticky-top',
+        NAVBAR_TOGGLER     : '.navbar-toggler'
+    }
+
+    const ON = true;
+    const OFF = false;
 
     const FOCUS_SELECTOR = [
         'button:not([disabled])',
@@ -133,7 +144,11 @@
         data() {
             return {
                 is_visible: false,
-                return_focus: this.returnFocus || null
+                return_focus: this.returnFocus || null,
+                scrollbarWidth: 0,
+                isEntering: false,
+                isLeaving: false,
+                isShown: false
             };
         },
         model: {
@@ -145,11 +160,17 @@
                 if (typeof document !== 'undefined') {
                     return document.querySelector('body');
                 }
+            },
+            isTransitioning() {
+                return this.isLeaving || this.isEntering;
+            },
+            isShowing() {
+                return !this.isTransitioning && (this.isShown || this.is_visible);
             }
         },
         watch: {
             visible(new_val, old_val) {
-                if (new_val === old_val) {
+                if (new_val === old_val || this.isTransitioning) {
                     return;
                 }
 
@@ -164,6 +185,10 @@
             id: {
                 type: String,
                 default: null
+            },
+            visible: {
+                type: Boolean,
+                default: false
             },
             title: {
                 type: String,
@@ -221,10 +246,6 @@
                 type: Boolean,
                 default: false
             },
-            visible: {
-                type: Boolean,
-                default: false
-            },
             returnFocus: {
                 default: null
             },
@@ -246,18 +267,18 @@
                 if (this.is_visible) {
                     return;
                 }
-                this.$emit('show');
                 this.is_visible = true;
-                this.$root.$emit('shown::modal', this.id);
-                this.body.classList.add('modal-open');
-                this.$emit('shown');
-                this.$emit('change', true);
-                if (typeof document !== 'undefined') {
-                    // Guard against infinite focus loop
-                    document.removeEventListener('focusin', this.enforceFocus, false);
-                    // Handle constrained focus
-                    document.addEventListener('focusin', this.enforceFocus, false);
+                if (this.noFade) {
+                    // If no fade animation, tehn triger the start ourselves
+                    this.onBeforeEnter();
                 }
+                this.body.classList.add('modal-open');
+                this.$emit('change', true);
+                if (this.noFade) {
+                    // If no fade animation, tehn triger the end ourselves
+                    this.onAfterEnter()
+                }
+                this.setListeners(ON);
             },
             hide(isOK) {
                 if (!this.is_visible) {
@@ -285,16 +306,12 @@
 
                 // Hide if not canceled
                 if (!canceled) {
-                    if (typeof document !== 'undefined') {
-                        // Remove focus handler
-                        document.removeEventListener('focusin', this.enforceFocus, false);
-                        // Return focus to original button/trigger element if provided
-                        this.returnFocusTo();
-                    }
+                    this.setListeners(OFF);
                     this.is_visible = false;
                     this.$root.$emit('hidden::modal', this.id);
                     this.$emit('hidden', e);
                     this.body.classList.remove('modal-open');
+                    this.returnFocusTo();
                 }
             },
             onClickOut() {
@@ -308,6 +325,43 @@
                 if (this.is_visible && !this.noCloseOnEsc) {
                     this.hide();
                 }
+            },
+            onBeforeEnter(el) {
+                this.$emit('show');
+                this.$root.$emit('shown::modal', this.id);
+                this.isEntering = true;
+            },
+            onEnter(el) {
+                // Add display:block after Vue v-show rmoves display:none
+                // Change this to a CSS data prop and apply as :style=
+                this.$refs.modal.style.display='block';
+            },
+            onAfterEnter() {
+                this.isEntering = false;
+                this.isShown = true;
+                this.$emit('shown');
+                this.focusFirst();
+            },
+            onBeforeLeave() {
+                this.isLeaving = true;
+                this.isShown = false;
+            },
+            onLeave(el) {
+            },
+            onAfterLeave() {
+                this.isLeaving = false;
+                this.$emit('hidden');
+            },
+            getScrollbarWidth() {
+                if (typeof document === 'undefined') {
+                    return 0;
+                }
+                const scrollDiv = document.createElement('div');
+                scrollDiv.className = ClassName.SCROLLBAR_MEASURER;
+                document.body.appendChild(scrollDiv);
+                this.scrollbarWidth = scrollDiv.getBoundingClientRect().width - scrollDiv.clientWidth;
+                document.body.removeChild(scrollDiv);
+                return this.scrollbarWidth;
             },
             focusFirst() {
                 // Don't try and focus if we are SSR
@@ -343,6 +397,10 @@
                 });
             },
             returnFocusTo() {
+                if (typeof document === 'undefined') {
+                    return;
+                }
+
                 // Prrefer returnFocus prop over event specified value
                 let el = this.returnFocus || this.return_focus || null;
 
@@ -358,6 +416,26 @@
                         // Plain element
                         el.focus();
                     }
+                }
+            },
+            setListeners(on) {
+                if (typeof document === 'undefined') {
+                    return;
+                }
+                if (on) {
+                    // Guard against infinite focus loop
+                    document.removeEventListener('focusin', this.enforceFocus, false);
+                    // Handle constrained focus
+                    document.addEventListener('focusin', this.enforceFocus, false);
+                    // Add resize listeners
+                    window.addEventListener('resize', this.handeSize, false);
+                    window.addEventListener('orientationchange', this.handeSize, false);
+                } else {
+                    // Remove focus handler
+                    document.removeEventListener('focusin', this.enforceFocus, false);
+                    // Remove resize listeners
+                    window.removeEventListener('resize', this.handleSize, false);
+                    window.removeEventListener('orientationchange', this.handleSize, false);
                 }
             },
             enforceFocus(e) {
@@ -389,15 +467,16 @@
             this.listenOnRoot('hide::modal', this.hideHandler);
         },
         mounted() {
+            // calculate hte scrollbar width once.
+            this.getScrollbarWidth();
+            // Initially show modal?
             if (this.visible === true) {
                 this.show();
             }
         },
         destroyed() {
-            // Make sure event listener is rmoved
-            if (typeof document !== 'undefined') {
-                document.removeEventListener('focusin', this.enforceFocus, false);
-            }
+            // Make sure global event listenerers are rmoved
+            this.setListeners(OFF);
         }
     };
 
