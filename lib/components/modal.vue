@@ -259,12 +259,7 @@
                 if (new_val === old_val || this.isTransitioning) {
                     return;
                 }
-
-                if (new_val) {
-                    this.show();
-                } else {
-                    this.hide();
-                }
+                return new_val ? this.show() : this.hide();
             }
         },
         methods: {
@@ -368,9 +363,6 @@
             },
             setScrollbar() {
                 if (this.isBodyOverflowing) {
-                    // Note: DOMNode.style.paddingRight returns the actual value or '' if not set
-                    //   while $(DOMNode).css('padding-right') returns the calculated value or 0 if not set
-
                     // Adjust fixed content padding
                     arrayFrom(document.querySelectorAll(Selector.FIXED_CONTENT)).forEach( (el, index) => {
                         const actualPadding = el.style.paddingRight || '';
