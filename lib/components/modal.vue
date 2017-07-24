@@ -404,9 +404,9 @@
                     });
 */
                     // Adjust body padding
-                    this.originalBodyPadding = document.body.style.paddingRight
+                    this.originalBodyPadding = document.body.style.paddingRight || '';
                     const calculatedPadding = parseFloat(getComputedStyle(document.body).paddingRight);
-                    document.body.style.paddingRight = `${calculatedPadding + this.scrollbarWidth}px`);
+                    document.body.style.paddingRight = `${calculatedPadding + this.scrollbarWidth}px`;
                 }
             },
             resetScrollbar() {
@@ -428,7 +428,7 @@
                 })
 */
                 // Restore body padding
-                document.body.style.paddingRight = this.originalBodyPadding;
+                document.body.style.paddingRight = this.originalBodyPadding || '';
             },
 
             focusFirst() {
