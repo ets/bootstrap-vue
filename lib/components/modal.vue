@@ -4,13 +4,11 @@
                     enter-active-class=""
                     enter-to-class=""
                     @before-enter="onBeforeEnter"
-                    @enter="onEnter"
                     @after-enter="onAfterEnter"
                     leave-class=""
                     leave-active-class=""
                     leave-to-class=""
                     @before-leave="onBeforeLeave"
-                    @leave="onLeave"
                     @after-leave="onAfterLeave"
         >
             <div :class="['modal',{fade: !noFade, show: isShowing}]"
@@ -18,7 +16,7 @@
                  role="dialog"
                  ref="modal"
                  key="modal"
-                 :css="modalCss"
+                 :style="modalStyle"
                  v-show="isShowing"
                  :aria-hidden="isShowing ? 'true' : 'false'"
                  @click="onClickOut"
@@ -156,33 +154,6 @@
             prop: 'visible',
             event: 'change'
         },
-        computed: {
-            isTransitioning() {
-                return this.isLeaving || this.isEntering;
-            },
-            isShowing() {
-                return !this.isTransitioning && (this.isShown || this.is_visible);
-            },
-            modalCss() {
-                return {
-                    paddingLeft: `${this.paddingLeft}px`,
-                    paddingRight: `${this.paddingRight}px`
-                };
-            }
-        },
-        watch: {
-            visible(new_val, old_val) {
-                if (new_val === old_val || this.isTransitioning) {
-                    return;
-                }
-
-                if (new_val) {
-                    this.show();
-                } else {
-                    this.hide();
-                }
-            }
-        },
         props: {
             id: {
                 type: String,
@@ -268,9 +239,37 @@
                 default: 'OK'
             }
         },
+        computed: {
+            isTransitioning() {
+                return this.isLeaving || this.isEntering;
+            },
+            isShowing() {
+                return !this.isTransitioning && (this.isShown || this.is_visible);
+            },
+            modalStyle() {
+                return {
+                    paddingLeft: `${this.paddingLeft}px`,
+                    paddingRight: `${this.paddingRight}px`,
+                    display: this.isShowing? 'block' : 'none'
+                };
+            }
+        },
+        watch: {
+            visible(new_val, old_val) {
+                if (new_val === old_val || this.isTransitioning) {
+                    return;
+                }
+
+                if (new_val) {
+                    this.show();
+                } else {
+                    this.hide();
+                }
+            }
+        },
         methods: {
             show() {
-                if (this.is_visible) {
+                if (this.is_visible || typeof document === 'undefined') {
                     return;
                 }
                 this.is_visible = true;
@@ -289,7 +288,7 @@
                 this.setListeners(ON);
             },
             hide(isOK) {
-                if (!this.is_visible) {
+                if (!this.is_visible || typeof document === 'undefined') {
                     return;
                 }
 
@@ -341,11 +340,6 @@
                 this.$root.$emit('shown::modal', this.id);
                 this.isEntering = true;
             },
-            onEnter(el) {
-                // Add display:block after Vue v-show rmoves display:none
-                // Change this to a CSS data prop and apply as :style=
-                this.$refs.modal.style.display='block';
-            },
             onAfterEnter() {
                 this.isEntering = false;
                 this.isShown = true;
@@ -356,8 +350,6 @@
             onBeforeLeave() {
                 this.isLeaving = true;
                 this.isShown = false;
-            },
-            onLeave(el) {
             },
             onAfterLeave() {
                 this.isLeaving = false;
