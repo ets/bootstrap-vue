@@ -18,10 +18,11 @@
                  role="dialog"
                  ref="modal"
                  key="modal"
+                 :css="modalCss"
                  v-show="isShowing"
                  :aria-hidden="isShowing ? 'true' : 'false'"
-                 @click="onClickOut()"
-                 @keyup.esc="onEsc()"
+                 @click="onClickOut"
+                 @keyup.esc="onEsc"
             >
 
                 <div :class="['modal-dialog','modal-'+size]">
@@ -79,7 +80,7 @@
         </transition>
         <div key="modal-backdrop"
              :class="['modal-backdrop',{fade: !noFade, show: is_visible || isTransitioning}]"
-             v-if="isShowing"
+             v-if="isShowing && !noBackdrop"
         ></div>
     </div>
 </template>
@@ -146,6 +147,10 @@
                 is_visible: false,
                 return_focus: this.returnFocus || null,
                 scrollbarWidth: 0,
+                isBodyOverflowing: false,
+                originalBodyPadding: '',
+                paddingLeft: 0,
+                paddingRight: 0,
                 isEntering: false,
                 isLeaving: false,
                 isShown: false
@@ -166,6 +171,12 @@
             },
             isShowing() {
                 return !this.isTransitioning && (this.isShown || this.is_visible);
+            },
+            modalCss() {
+                return {
+                    paddingLeft: `${this.paddingLeft}px`,
+                    paddingRight: `${this.paddingRight}px`
+                };
             }
         },
         watch: {
@@ -215,6 +226,10 @@
                 default: false
             },
             noCloseOnEsc: {
+                type: Boolean,
+                default: false
+            },
+            noBackdrop: {
                 type: Boolean,
                 default: false
             },
@@ -268,15 +283,17 @@
                     return;
                 }
                 this.is_visible = true;
+                this.isBodyOverflowing = document.body.clientWidth < window.innerWidth;
+                this.setScrollbar();
                 if (this.noFade) {
-                    // If no fade animation, tehn triger the start ourselves
+                    // If no fade animation, then triger the start ourselves
                     this.onBeforeEnter();
                 }
-                this.body.classList.add('modal-open');
+                this.body.classList.add(ClassName.OPEN);
                 this.$emit('change', true);
                 if (this.noFade) {
-                    // If no fade animation, tehn triger the end ourselves
-                    this.onAfterEnter()
+                    // If no fade animation, then triger the end ourselves
+                    this.onAfterEnter();
                 }
                 this.setListeners(ON);
             },
@@ -308,9 +325,11 @@
                 if (!canceled) {
                     this.setListeners(OFF);
                     this.is_visible = false;
+                    this.isBodyOverflowing = false;
+                    this.resetScrollbar();
                     this.$root.$emit('hidden::modal', this.id);
                     this.$emit('hidden', e);
-                    this.body.classList.remove('modal-open');
+                    this.body.classList.remove(ClassName.OPEN);
                     this.returnFocusTo();
                 }
             },
@@ -339,6 +358,7 @@
             onAfterEnter() {
                 this.isEntering = false;
                 this.isShown = true;
+                this.adjustModal();
                 this.$emit('shown');
                 this.focusFirst();
             },
@@ -363,6 +383,54 @@
                 document.body.removeChild(scrollDiv);
                 return this.scrollbarWidth;
             },
+            setScrollbar() {
+/*
+                if (this.isBodyOverflowing) {
+                    // Note: DOMNode.style.paddingRight returns the actual value or '' if not set
+                    //   while $(DOMNode).css('padding-right') returns the calculated value or 0 if not set
+
+                    // Adjust fixed content padding
+                    $(Selector.FIXED_CONTENT).each((index, element) => {
+                        const actualPadding = $(element)[0].style.paddingRight;
+                        const calculatedPadding = $(element).css('padding-right');
+                        $(element).data('padding-right', actualPadding).css('padding-right', `${parseFloat(calculatedPadding) + this._scrollbarWidth}px`);
+                    });
+
+                    // Adjust navbar-toggler margin
+                    $(Selector.NAVBAR_TOGGLER).each((index, element) => {
+                        const actualMargin = $(element)[0].style.marginRight;
+                        const calculatedMargin = $(element).css('margin-right');
+                        $(element).data('margin-right', actualMargin).css('margin-right', `${parseFloat(calculatedMargin) + this._scrollbarWidth}px`);
+                    });
+*/
+                    // Adjust body padding
+                    this.originalBodyPadding = document.body.style.paddingRight
+                    const calculatedPadding = parseFloat(getComputedStyle(document.body).paddingRight);
+                    document.body.style.paddingRight = `${calculatedPadding + this.scrollbarWidth}px`);
+                }
+            },
+            resetScrollbar() {
+                // Restore fixed content padding
+/*
+                $(Selector.FIXED_CONTENT).each((index, element) => {
+                    const padding = $(element).data('padding-right');
+                    if (typeof padding !== 'undefined') {
+                        $(element).css('padding-right', padding).removeData('padding-right');
+                    }
+                });
+
+                // Restore navbar-toggler margin
+                $(Selector.NAVBAR_TOGGLER).each((index, element) => {
+                    const margin = $(element).data('margin-right');
+                    if (typeof margin !== 'undefined') {
+                        $(element).css('margin-right', margin).removeData('margin-right');
+                    }
+                })
+*/
+                // Restore body padding
+                document.body.style.paddingRight = this.originalBodyPadding;
+            },
+
             focusFirst() {
                 // Don't try and focus if we are SSR
                 if (typeof document === 'undefined') {
@@ -418,6 +486,12 @@
                     }
                 }
             },
+            adjustModal() {
+                // Handler for adjusting modal padding.
+                const isModalOverflowing = this.$el.scrollHeight > document.documentElement.clientHeight;
+                this.paddingLeft = (!this.isBodyOverflowing && isModalOverflowing) ? this.scrollbarWidth : 0;
+                this.paddingRight = (this.isBodyOverflowing && !isModalOverflowing) ? this.scrollbarWidth : 0;
+            },
             setListeners(on) {
                 if (typeof document === 'undefined') {
                     return;
@@ -428,14 +502,14 @@
                     // Handle constrained focus
                     document.addEventListener('focusin', this.enforceFocus, false);
                     // Add resize listeners
-                    window.addEventListener('resize', this.handeSize, false);
-                    window.addEventListener('orientationchange', this.handeSize, false);
+                    window.addEventListener('resize', this.adjustModal, false);
+                    window.addEventListener('orientationchange', this.adjustModal, false);
                 } else {
                     // Remove focus handler
                     document.removeEventListener('focusin', this.enforceFocus, false);
                     // Remove resize listeners
-                    window.removeEventListener('resize', this.handleSize, false);
-                    window.removeEventListener('orientationchange', this.handleSize, false);
+                    window.removeEventListener('resize', this.adjustModal, false);
+                    window.removeEventListener('orientationchange', this.adjustModal, false);
                 }
             },
             enforceFocus(e) {
@@ -467,7 +541,7 @@
             this.listenOnRoot('hide::modal', this.hideHandler);
         },
         mounted() {
-            // calculate hte scrollbar width once.
+            // calculate the scrollbar width once.
             this.getScrollbarWidth();
             // Initially show modal?
             if (this.visible === true) {
