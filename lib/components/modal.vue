@@ -96,7 +96,6 @@
     }
 
     const Selector = {
-        DIALOG             : '.modal-dialog',
         FIXED_CONTENT      : '.fixed-top, .fixed-bottom, .is-fixed, .sticky-top',
         NAVBAR_TOGGLER     : '.navbar-toggler'
     }
@@ -123,7 +122,7 @@
         if (!root || !root.querySelectorAll || !selector) {
             return null;
         }
-        let els = arrayFrom(root.querySelectorAll(selector));
+        const els = arrayFrom(root.querySelectorAll(selector));
 
         // IE 10 & 11 do not support native array.find()
         // So we try native find first, then fall back to a loop
@@ -380,21 +379,22 @@
                     // Note: DOMNode.style.paddingRight returns the actual value or '' if not set
                     //   while $(DOMNode).css('padding-right') returns the calculated value or 0 if not set
 
-/*
                     // Adjust fixed content padding
-                    $(Selector.FIXED_CONTENT).each((index, element) => {
-                        const actualPadding = $(element)[0].style.paddingRight;
-                        const calculatedPadding = $(element).css('padding-right');
-                        $(element).data('padding-right', actualPadding).css('padding-right', `${parseFloat(calculatedPadding) + this._scrollbarWidth}px`);
+                    arrayFrom(document.querySelectorAll(Selector.FIXED_CONTENT)).forEach( (el, index) => {
+                        const actualPadding = el.style.paddingRight || '';
+                        const calculatedPadding = parseFloat(getComputedStyle(el).paddingRight);
+                        el.setAttribute('data-padding-right', actualPadding);
+                        el.style.paddingRight = `${calculatedPadding + this.scrollbarWidth}px`;
                     });
 
                     // Adjust navbar-toggler margin
-                    $(Selector.NAVBAR_TOGGLER).each((index, element) => {
-                        const actualMargin = $(element)[0].style.marginRight;
-                        const calculatedMargin = $(element).css('margin-right');
-                        $(element).data('margin-right', actualMargin).css('margin-right', `${parseFloat(calculatedMargin) + this._scrollbarWidth}px`);
+                    arrayFrom(document.querySelectorAll(Selector.NAVBAR_TOGGLER)).forEach( (el, index) => {
+                        const actualMargin = el.style.marginRight || '';
+                        const calculatedMargin = parseFloat(getComputedStyle(el).marginRight);
+                        el.setAttribut('data-margin-right', actualMargin);
+                        el.style.marginRight = `${calculatedMargin + this.scrollbarWidth}px`;
                     });
-*/
+
                     // Adjust body padding
                     this.originalBodyPadding = document.body.style.paddingRight || '';
                     const calculatedPadding = parseFloat(getComputedStyle(document.body).paddingRight);
@@ -403,22 +403,19 @@
             },
             resetScrollbar() {
                 // Restore fixed content padding
-/*
-                $(Selector.FIXED_CONTENT).each((index, element) => {
-                    const padding = $(element).data('padding-right');
-                    if (typeof padding !== 'undefined') {
-                        $(element).css('padding-right', padding).removeData('padding-right');
-                    }
+                arrayFrom(document.querySelectorAll(Selector.FIXED_CONTENT)).forEach( (el, index) => {
+                    const padding = el.getAttribute('data-padding-right') || '';
+                    el.style.paddingRight = padding;
+                    el.removeAttribute('data-padding-right');
                 });
 
                 // Restore navbar-toggler margin
-                $(Selector.NAVBAR_TOGGLER).each((index, element) => {
-                    const margin = $(element).data('margin-right');
-                    if (typeof margin !== 'undefined') {
-                        $(element).css('margin-right', margin).removeData('margin-right');
-                    }
-                })
-*/
+                arrayFrom(document.querySelectorAll(Selector.NAVBAR_TOGGLER)).forEach( (el, index) => {
+                    const margin = el.getAttribute('data-margin-right') || '';
+                    el.style.marginRight = margin;
+                    el.removeAttribute('data-margin-right');
+                });
+
                 // Restore body padding
                 document.body.style.paddingRight = this.originalBodyPadding || '';
             },
