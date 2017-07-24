@@ -158,11 +158,6 @@
             event: 'change'
         },
         computed: {
-            body() {
-                if (typeof document !== 'undefined') {
-                    return document.querySelector('body');
-                }
-            },
             isTransitioning() {
                 return this.isLeaving || this.isEntering;
             },
@@ -286,7 +281,7 @@
                     // If no fade animation, then triger the start ourselves
                     this.onBeforeEnter();
                 }
-                this.body.classList.add(ClassName.OPEN);
+                document.body.classList.add(ClassName.OPEN);
                 this.$emit('change', true);
                 if (this.noFade) {
                     // If no fade animation, then triger the end ourselves
@@ -326,7 +321,7 @@
                     this.resetScrollbar();
                     this.$root.$emit('hidden::modal', this.id);
                     this.$emit('hidden', e);
-                    this.body.classList.remove(ClassName.OPEN);
+                    document.body.classList.remove(ClassName.OPEN);
                     this.returnFocusTo();
                 }
             },
