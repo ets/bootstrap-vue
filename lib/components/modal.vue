@@ -92,10 +92,7 @@
 
     const ClassName = {
         SCROLLBAR_MEASURER : 'modal-scrollbar-measure',
-        BACKDROP           : 'modal-backdrop',
-        OPEN               : 'modal-open',
-        FADE               : 'fade',
-        SHOW               : 'show'
+        OPEN               : 'modal-open'
     }
 
     const Selector = {
@@ -384,11 +381,11 @@
                 return this.scrollbarWidth;
             },
             setScrollbar() {
-/*
                 if (this.isBodyOverflowing) {
                     // Note: DOMNode.style.paddingRight returns the actual value or '' if not set
                     //   while $(DOMNode).css('padding-right') returns the calculated value or 0 if not set
 
+/*
                     // Adjust fixed content padding
                     $(Selector.FIXED_CONTENT).each((index, element) => {
                         const actualPadding = $(element)[0].style.paddingRight;
@@ -430,7 +427,6 @@
                 // Restore body padding
                 document.body.style.paddingRight = this.originalBodyPadding || '';
             },
-
             focusFirst() {
                 // Don't try and focus if we are SSR
                 if (typeof document === 'undefined') {
