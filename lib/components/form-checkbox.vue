@@ -1,29 +1,36 @@
 <template>
-    <label :class="button ? btnLabelClasses : labelClasses"
-           :aria-pressed="button ? (isChecked ? 'true' : 'false') : null"
+<div :role="multiple ? 'group' : null"
+     :id="id || null"
+     :class="buttons ? btnGroupClasses : checkGroupClasses"
+>
+    <label v-for="(option, idx) in checkOptions"
+           :class="(button || buttons) ? btnLabelClasses : labelClasses"
+           :aria-pressed="(button || buttons) ? (isChecked(option.value) ? 'true' : 'false') : null"
     >
         <input type="checkbox"
-               :id="id || null"
+               :id="id ? `__BV_checkbox_${id}_${idx}_` :  null"
                :name="name"
-               :value="value"
-               :disabled="disabled"
-               :required="required"
-               ref="check"
+               :value="option.value"
+               :disabled="disabled || option.disabled"
+               :required="multiple ? null : required"
                autocomplete="off"
-               :aria-required="required ? 'true' : null"
-               :class="(custom && !button ) ? 'custom-control-input' : null"
-               :checked="isChecked"
+               :aria-required="multiple ? null : (required ? 'true' : null)"
+               :class="(custom && !isButtons) ? 'custom-control-input' : null"
+               :checked="isChecked(option.value)"
                @focusin.native="handleFocus"
                @focusout.native="handleFocus"
                @change="handleChange">
-        <span v-if="custom && !button"
+        <span v-if="custom && !isButtons"
               class="custom-control-indicator"
               aria-hidden="true"
         ></span>
-        <span :class="(custom && !button) ? 'custom-control-description' : null">
-            <slot></slot>
+        <span :class="(custom && !isButtons) ? 'custom-control-description' : null">
+            <template v-if="!multiple">
+                <slot></slot>
+            </templat>
         </span>
     </label>
+</div>
 </template>
 
 <script>
@@ -34,7 +41,12 @@ export default {
     mixins: [formMixin, formCustomMixin, formCheckBoxMixin],
     model: {
         prop: 'checked',
-        event: 'change'
+        event: 'change' // chagned from `change`
+    },
+    data() {
+        return {
+            localValue: this.multiple ? (this.checked || []) : this.cheked;
+        };
     },
     props: {
         value: {
@@ -54,6 +66,10 @@ export default {
             type: String,
             default: null
         },
+        inline: {
+            type: Boolean,
+            default: false
+        },
         button: {
             type: Boolean,
             default: false,
@@ -64,6 +80,35 @@ export default {
         }
     },
     computed: {
+        multiple() {
+            return this.options ? true : false;
+        },
+        isButtons() {
+            return this.button || this.buttons;
+        },
+        checkGroupClasses() {
+            if (this.multiple) {
+                return [
+                    this.size ? `form-control-${this.size}` : null,
+                    this.state ? `has-${this.state}` : '',
+                    this.stacked ? 'custom-controls-stacked' : ''
+               ];
+            }
+            return [];
+        },
+        btnGroupClasses() {
+            if (this.multiple) {
+                return [
+                    this.size ? `button-group-${this.size}` : null,
+                    this.stacked ? 'btn-group-vertical' : ''
+                 ];
+               ];
+            }
+            return [];
+        },
+        checkOptions() {
+            return this.multiple ? this.formOptions : [ { value: this.value } ];
+        },
         labelClasses() {
             return [
                 this.size ? `form-control-${this.size}` : '',
@@ -75,17 +120,10 @@ export default {
             return [
                 'btn',
                 `btn-${this.buttonVariant}`,
-                this.size ? `btn-${this.size}` : '',
+                (this.size && !this.multiple ) ? `btn-${this.size}` : '',
                 this.isChecked ? 'active' : '',
                 this.disabled ? 'disabled' : ''
             ];
-        },
-        isChecked() {
-            if (isArray(this.checked)) {
-                return arrayIncludes(this.checked, this.value);
-            } else {
-                return this.checked === this.value;
-            }
         }
     },
     watch: {
@@ -94,6 +132,13 @@ export default {
         }
     },
     methods: {
+        isChecked(val) {
+            if (isArray(this.checked)) {
+                return arrayIncludes(this.checked, val);
+            } else {
+                return this.checked === val;
+            }
+        },
         handleChange({ target: { checked } }) {
             if (isArray(this.checked)) {
                 if (this.isChecked) {
@@ -113,11 +158,11 @@ export default {
         },
         handleFocus(evt) {
             // Add or remove 'focus' class on label in button mode
-            if (this.button && evt.target === this.$refs.check) {
+            if (this.button || this.buttons) {
                 if (evt.type === 'focusin') {
-                    this.$el.classList.add('focus');
+                    evt.target.classList.add('focus');
                 } else if (evt.type === 'focusout') {
-                    this.$el.classList.remove('focus');
+                    evt.target.classList.remove('focus');
                 }
             }
         }
